@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:water/core/database/database_constants.dart';
 import 'package:water/data/models/client_model.dart';
@@ -114,11 +115,13 @@ class ClientRepository {
       final response = await _supabase
           .from('clients')
           .update({
-        'name': client.name,
-        'phone': client.phone,
-        'meter_number': client.meterNumber,
-        'address': client.address,
-        'notes': client.notes
+        DatabaseConstants.clientName: client.name,
+        DatabaseConstants.clientPhone: client.phone,
+        DatabaseConstants.meterNumber: client.meterNumber,
+        DatabaseConstants.clientAddress: client.address,
+        DatabaseConstants.totalDebt: client.totalDebt,
+        DatabaseConstants.notes : client.notes
+
       }).eq(DatabaseConstants.clientId, client.id!)
           .select()
           .single();
@@ -131,7 +134,6 @@ class ClientRepository {
 
 
     } catch (e) {
-      print('Error in updateClient: $e');
       rethrow;
     }
   }
@@ -140,10 +142,10 @@ class ClientRepository {
   Future<void> deleteClient({required int id}) async {
     try {
       // حذف القراءات المرتبطة أولاً
-      await _supabase
-          .from('readings')
-          .delete()
-          .eq(DatabaseConstants.readingId, id);
+      // await _supabase
+      //     .from('readings')
+      //     .delete()
+      //     .eq(DatabaseConstants.readingId, id);
 
       await _supabase
           .from('clients')
@@ -207,7 +209,7 @@ class ClientRepository {
       double totalDebt = 0;
       int clientsWithDebt = 0;
 
-      if (response != null && response is List) {
+      if (!response.isNull && response is List) {
         for (var client in response) {
           final debt = client['total_debt'] ?? 0.0;
           totalDebt += debt;
@@ -234,22 +236,24 @@ class ClientRepository {
   }) async {
     try {
       if (remaining == 0) {
-        await _supabase
-            .from('readings')
+        await _supabase.from('readings')
             .update({
           'is_paid': true,
           'remaining_amount': 0.0,
           DatabaseConstants.payby: payBy,
-        })
-            .eq(DatabaseConstants.readingId, invoiceId);
+        }).eq(DatabaseConstants.readingId, invoiceId);
+
+        print('remaining ${remaining}');
+
       } else {
-        await _supabase
-            .from('readings')
+        await _supabase.from('readings')
             .update({
           'remaining_amount': remaining,
           DatabaseConstants.payby: payBy,
-        })
-            .eq(DatabaseConstants.readingId, invoiceId);
+        }).eq(DatabaseConstants.readingId, invoiceId);
+
+        print('remain $remaining');
+
       }
     } catch (e) {
       print('Error in updateInvoiceStatus: $e');

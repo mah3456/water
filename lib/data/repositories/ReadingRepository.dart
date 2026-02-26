@@ -13,7 +13,7 @@ class ReadingsRepository {
         .single();
 
 
-    print('insert | ${response}');
+    print('insert | ${reading.toMap()}');
 
     if(response.isNotEmpty){
       return 1;

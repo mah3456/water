@@ -40,12 +40,12 @@ class InvoiceModel {
   // تنسيق المبلغ
   String get formattedAmount {
     final formatter = NumberFormat('#,##0.00', 'ar');
-    return '${formatter.format(reading.totalAmount)} ر.ي';
+    return '${formatter.format(reading.totalAmount! + 300.0)} ر.ي';
   }
 
   String get formattedPaid {
     final formatter = NumberFormat('#,##0.00', 'ar');
-    return '${formatter.format(reading.totalAmount! - reading.remainingAmount!)} ر.ي';
+    return '${formatter.format(reading.totalAmount! + 300 - reading.remainingAmount!)} ر.ي';
   }
 
 

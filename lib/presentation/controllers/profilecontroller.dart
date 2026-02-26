@@ -5,10 +5,9 @@ import 'package:water/core/utils/helpers.dart';
 import '../../core/supabase/supabase_user_helper.dart';
 import '../../data/models/user_model.dart';
 
-
 class ProfileController extends GetxController {
   final SupabaseClient supabase = Supabase.instance.client;
-   final SupabaseUserRepository userHelper = SupabaseUserRepository();
+  final SupabaseUserRepository userHelper = SupabaseUserRepository();
 
   Rx<User?> currentUser = Rx<User?>(null);
   Rx<Map<String, dynamic>> userProfile = Rx<Map<String, dynamic>>({});
@@ -21,7 +20,7 @@ class ProfileController extends GetxController {
     super.onInit();
     getCurrentUser();
     setupAuthListener();
-    getUserProfile(userId: currentUser.value!.id);
+    getUserProfile(userId: currentUser.value?.id ?? 0);
   }
 
   // الحصول على المستخدم الحالي
@@ -36,9 +35,9 @@ class ProfileController extends GetxController {
       }
     } catch (e) {
       Helpers.customSnackBar(
-          title: 'خطأ',
-          message: 'خطأ في الحصول على المستخدم',
-          background: Colors.red
+        title: 'خطأ',
+        message: 'خطأ في الحصول على المستخدم',
+        background: Colors.red,
       );
     } finally {
       isLoading.value = false;
@@ -72,30 +71,16 @@ class ProfileController extends GetxController {
 
       if (data != null) {
         userProfile.value = Map<String, dynamic>.from(data);
-      } else {
-
-      }
+      } else {}
     } on PostgrestException catch (e) {
       if (e.code == '406' || e.code == 'PGRST116') {
       } else {
-        print(e.message);
-        Get.snackbar(
-          'خطأ',
-          e.message,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-
+        rethrow;
       }
-    } catch (e) {
-      print('خطا ${e}');
     } finally {
       isLoading.value = false;
     }
   }
-
-
 
   Future<bool> updateProfile({
     required String name,
@@ -104,7 +89,6 @@ class ProfileController extends GetxController {
     try {
       isLoading.value = true;
 
-
       final updatedUser = UserModel(
         name: name,
         phone: phone,
@@ -112,43 +96,64 @@ class ProfileController extends GetxController {
         createdAt: DateTime.now(),
       );
 
-      final updatedData = await userHelper.editeProfile(userId: currentUser.value!.id.toString(), user: updatedUser);
+      final updatedData = await userHelper.editeProfile(
+        userId: currentUser.value!.id.toString(),
+        user: updatedUser,
+      );
 
-       getCurrentUser();
+      getCurrentUser();
 
-       print(updatedData);
+      print(updatedData);
 
       // عرض رسالة نجاح
-      if(updatedData.isNotEmpty){
+      if (updatedData.isNotEmpty) {
         return true;
-      } else{
+      } else {
         return false;
       }
-
     } on PostgrestException catch (e) {
+      if (e.message.contains(
+        'duplicate key value violates unique constraint "users_phone_key"',
+      )) {
+        Helpers.customSnackBar(
+          title: 'فشل',
+          message: 'رقم الهاتف هذا مستخدم بالفعل',
+          background: Colors.red,
+        );
+      }
 
-        if (e.message.contains('duplicate key value violates unique constraint "users_phone_key"')) {
-          Helpers.customSnackBar(
-            title: 'فشل',
-            message: 'رقم الهاتف هذا مستخدم بالفعل',
-            background: Colors.red,
-          );
-        }
+      rethrow;
+    } catch (e) {
+      if (e.toString().contains(
+        'ClientException with SocketException: Failed host lookup',
+      )) {
+        Helpers.customSnackBar(
+          title: 'خطا!',
+          message: 'لا يوجد اتصال بالانترنت',
+          background: Colors.red,
+        );
+      }
 
-        rethrow;
+      Helpers.customSnackBar(
+          title: 'خطا!',
+          message: 'فشل  التحديث',
+          background: Colors.red
+      );
+
+      rethrow;
     } finally {
-
       isLoading.value = false;
     }
   }
 
-
   // تسجيل الخروج
   Future<void> signOut() async {
     try {
-      await supabase.auth.signOut();
+      var response = await supabase.auth.signOut();
       currentUser.value = null;
       userProfile.value = {};
+
+      return response;
     } catch (e) {
       print('خطأ في تسجيل الخروج: $e');
     }
@@ -159,7 +164,8 @@ class ProfileController extends GetxController {
 
   // جلب بيانات محددة
   String get fullName => userProfile.value['name'] ?? 'غير محدد';
-  String get email => userProfile.value['email'] ?? currentUser.value?.email ?? 'غير محدد';
+  String get email =>
+      userProfile.value['email'] ?? currentUser.value?.email ?? 'غير محدد';
   String get phone => userProfile.value['phone'] ?? 'غير محدد';
   String get createdAt {
     if (currentUser.value?.createdAt != null) {

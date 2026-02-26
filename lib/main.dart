@@ -3,10 +3,10 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:water/core/themes/theme.dart';
-import 'package:water/data/models/client_model.dart';
 import 'package:water/presentation/controllers/ClientsController.dart';
 import 'package:water/presentation/controllers/ReadingController.dart';
 import 'package:water/presentation/controllers/auth_controller.dart';
+import 'package:water/presentation/controllers/profilecontroller.dart';
 import 'package:water/presentation/views/auth/login_screen.dart';
 import 'package:water/presentation/views/auth/register_screen.dart';
 import 'package:water/presentation/views/clients/add_client_screen.dart';
@@ -15,7 +15,6 @@ import 'package:water/presentation/views/clients/clients_screen.dart';
 import 'package:water/presentation/views/clients/pay_bill_screen.dart';
 import 'package:water/presentation/views/home/home_screen.dart';
 import 'package:water/presentation/views/readings/add_reading_screen.dart';
-import 'core/supabase/supabase_client_helper.dart';
 import 'core/themes/theme_data.dart';
 
 
@@ -35,7 +34,6 @@ void main() async {
   try {
     runApp(const MyApp());
   } catch (e) {
-    print('خطأ في تهيئة التطبيق: $e');
     runApp(const ErrorApp());
   }
 }
@@ -55,13 +53,13 @@ class MyApp extends StatelessWidget {
         fontFamily: 'cairo',
         useMaterial3: true,
         colorScheme: AppColors.lightScheme,
-        scaffoldBackgroundColor: AppColors.lightScheme.background,
+        scaffoldBackgroundColor: AppColors.lightScheme.surface,
       ),
       darkTheme: ThemeData(
         fontFamily: 'cairo',
         useMaterial3: true,
         colorScheme: AppColors.darkScheme,
-        scaffoldBackgroundColor: AppColors.darkScheme.background,
+        scaffoldBackgroundColor: AppColors.darkScheme.surface,
       ),
       defaultTransition: Transition.noTransition,
 
@@ -83,6 +81,8 @@ class MyApp extends StatelessWidget {
         Get.put(AuthController());
         Get.put(ClientsController());
         Get.put(ReadingsController());
+        Get.put(ProfileController());
+
       }),
       debugShowCheckedModeBanner: false,
 

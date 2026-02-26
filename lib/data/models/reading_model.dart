@@ -8,6 +8,7 @@ class ReadingModel {
   int clientId;
   int currentReading;
   int previousReading;
+  int? subscription;
   int? consumption;
   DateTime readingDate;
   double ratePerUnit;
@@ -23,6 +24,7 @@ class ReadingModel {
     this.id,
     this.reader,
     this.payby,
+    this.subscription,
     required this.clientId,
     required this.currentReading,
     required this.previousReading,
@@ -41,6 +43,7 @@ class ReadingModel {
       DatabaseConstants.reader: reader,
       DatabaseConstants.currentReading: currentReading,
       DatabaseConstants.previousReading: previousReading,
+      DatabaseConstants.subscription: subscription,
       DatabaseConstants.readingDate: readingDate.toIso8601String(),
       DatabaseConstants.ratePerUnit: ratePerUnit,
       DatabaseConstants.remainingAmount: remainingAmount,
@@ -57,6 +60,7 @@ class ReadingModel {
       currentReading: map[DatabaseConstants.currentReading],
       previousReading: map[DatabaseConstants.previousReading],
       consumption: map[DatabaseConstants.consumption],
+      subscription: map[DatabaseConstants.subscription] ?? 0,
       payby: map[DatabaseConstants.payby] ?? 'لا يوجد',
       readingDate: DateTime.parse(map[DatabaseConstants.readingDate]),
       ratePerUnit: map[DatabaseConstants.ratePerUnit]?.toDouble() ?? 2.0,

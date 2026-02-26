@@ -1,13 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/supabase/supabase_client_helper.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../data/models/client_model.dart';
 import '../../../data/models/reading_model.dart';
 import '../../../wigets/loading_widget.dart';
 import '../../controllers/ClientsController.dart';
+import '../../controllers/InvoiceController.dart';
 import '../../controllers/ReadingController.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/client_controller.dart';
 import '../../controllers/profilecontroller.dart';
 import '../../controllers/reading_controller.dart';
@@ -19,10 +22,12 @@ class PayBillScreen extends StatefulWidget {
   State<PayBillScreen> createState() => _PayBillScreenState();
 }
 
-class _PayBillScreenState extends State<PayBillScreen> {
+class _PayBillScreenState extends State<PayBillScreen> with TickerProviderStateMixin {
   final ClientsController _clientController = Get.put(ClientsController());
   final ReadingsController _readingController = Get.put(ReadingsController());
   final ProfileController user = Get.put(ProfileController());
+  final InvoiceController invoice = Get.put(InvoiceController());
+  final AuthController _authController = Get.find<AuthController>();
 
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
@@ -31,22 +36,43 @@ class _PayBillScreenState extends State<PayBillScreen> {
   ClientModel? selectedClient;
   List<ReadingModel> unpaidInvoices = [];
   ReadingModel? selectedInvoice;
-  var isLoading = true.obs;
-  var paymentMethod = 'نقداً';
+  RxBool isLoading = true.obs;
+  RxBool isProcessing = false.obs;
+  String paymentMethod = 'نقداً';
   bool paySpecificInvoice = false;
+
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _loadClient();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadClient();
+      _animationController.forward();
+    });
   }
 
-
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    _animationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _loadClient() async {
     final clientId = Get.arguments;
     if (clientId != null && clientId is int) {
-      final client = await _clientController.getClientById(clientId: clientId,);
+      final client = await _clientController.getClientById(clientId: clientId);
       if (client != null) {
         setState(() {
           selectedClient = client;
@@ -66,68 +92,77 @@ class _PayBillScreenState extends State<PayBillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('تسديد فاتورة'),
+        title: const Text(
+          'تسديد فاتورة',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
+        elevation: 0,
+        backgroundColor: theme.primaryColor,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_right),
+          onPressed: () => Get.back(),
+        ),
       ),
       body: Obx(() {
         if (isLoading.value) {
-          return  Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary,)),
-              const SizedBox(height: 20),
-
-              Text('جاري التحميل ...')
-            ],
-          );
+          return _buildLoadingState(theme);
         }
 
         if (selectedClient == null) {
-          return const Center(child: Text('العميل غير موجود'));
+          return _buildErrorState(theme);
         }
 
         return Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // معلومات العميل
-                    _buildClientInfoCard(),
-                    const SizedBox(height: 20),
-
-                    // اختيار نوع الدفع
-                    // _buildPaymentTypeSelector(),
-                    const SizedBox(height: 20),
-
-                    // إذا كان الدفع لفاتورة محددة
-                      _buildInvoiceSelector(),
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // معلومات العميل
+                      _buildClientInfoCard(theme),
                       const SizedBox(height: 20),
 
+                      // اختيار طريقة الدفع
+                      // _buildPaymentMethodSelector(theme),
+                      const SizedBox(height: 20),
 
-                    // حقل إدخال المبلغ
-                    _buildAmountField(),
-                    const SizedBox(height: 20),
+                      // اختيار الفاتورة
+                      if (unpaidInvoices.isNotEmpty) ...[
+                        _buildInvoiceSelector(theme),
+                        const SizedBox(height: 20),
+                      ],
 
-                    // ملاحظات
-                    _buildNotesField(),
-                    const SizedBox(height: 30),
+                      // حقل إدخال المبلغ
+                      _buildAmountField(theme),
+                      const SizedBox(height: 20),
 
-                    const SizedBox(height: 30),
+                      // ملاحظات
+                      _buildNotesField(theme),
+                      const SizedBox(height: 30),
 
-                    // أزرار الإجراء
-                    _buildActionButtons(),
-                  ],
+                      // أزرار الإجراء
+                      _buildActionButtons(theme),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            if (_clientController.isLoading.value)
+            if (isProcessing.value)
               LoadingWidget()
           ],
         );
@@ -135,76 +170,153 @@ class _PayBillScreenState extends State<PayBillScreen> {
     );
   }
 
-  Widget _buildClientInfoCard() {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildLoadingState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: CircularProgressIndicator(
+              color: theme.primaryColor,
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'جاري تحميل البيانات...',
+            style: TextStyle(
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Iconsax.warning_2,
+              size: 60,
+              color: Colors.red,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'العميل غير موجود',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.titleLarge?.color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'لم نتمكن من العثور على بيانات العميل',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Get.back(),
+            icon: const Icon(Iconsax.arrow_left),
+            label: const Text('العودة'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClientInfoCard(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(width: 1 , color: Color(0x0ff3c56c)),
+
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.person, size: 24, color: Colors.blue),
-                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(Iconsax.profile_circle, color: Colors.white, size: 30),
+                ),
+                const SizedBox(width: 15),
                 Expanded(
-                  child: Text(
-                    selectedClient!.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selectedClient!.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'رقم العداد: ${selectedClient!.meterNumber}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
+            const Divider(color: Colors.white30, height: 1),
+            const SizedBox(height: 20),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                const Icon(Icons.confirmation_number, size: 20, color: Colors.grey),
-                const SizedBox(width: 10),
-                Text(
-                  'رقم العداد: ${selectedClient!.meterNumber}',
-                  style: const TextStyle(fontSize: 16),
+                _buildClientStat(
+                  icon: Iconsax.money,
+                  value: Helpers.formatCurrency(selectedClient!.totalDebt),
+                  label: 'إجمالي الدين',
+                  color: Colors.red,
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.money_off, size: 20, color: Colors.red),
-                    const SizedBox(width: 10),
-                    Text(
-                      'الدين الحالي:',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ],
-                ),
-                Text(
-                  Helpers.formatCurrency(selectedClient!.totalDebt),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('عدد الفواتير غير المدفوعة:'),
-                Chip(
-                  label: Text(
-                    '${unpaidInvoices.length} فاتورة',
-                  ),
+                _buildClientStat(
+                  icon: Iconsax.receipt,
+                  value: '${unpaidInvoices.length}',
+                  label: 'فواتير غير مدفوعة',
+                  color: Colors.orange,
                 ),
               ],
             ),
@@ -214,62 +326,98 @@ class _PayBillScreenState extends State<PayBillScreen> {
     );
   }
 
-
-  Widget _buildInvoiceSelector() {
-    if (unpaidInvoices.isEmpty) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  const Icon(Icons.check_circle, size: 48, color: Colors.green),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'لا توجد فواتير غير مدفوعة',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  const Text(
-                    'جميع فواتير هذا العميل تم دفعها',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-
-                ],
-              ),
-            ),
+  Widget _buildClientStat({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
-      );
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildInvoiceSelector(ThemeData theme) {
+    if (unpaidInvoices.isEmpty) {
+      return _buildNoInvoicesCard(theme);
     }
 
-    return Card(
-      elevation: 2,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(width: 1 , color: Color(0x0ff3c56c)),
+
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                const Text(
-                  'اختر الفاتورة المراد تسديدها',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Iconsax.receipt, color: theme.primaryColor, size: 20),
                 ),
-
+                const SizedBox(width: 12),
+                const Text(
+                  'اختر الفاتورة',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${unpaidInvoices.length} فواتير',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
-
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             ...unpaidInvoices.map((invoice) {
-              return _buildInvoiceItem(invoice);
+              return _buildInvoiceItem(invoice, theme);
             }).toList(),
           ],
         ),
@@ -277,12 +425,63 @@ class _PayBillScreenState extends State<PayBillScreen> {
     );
   }
 
-  Widget _buildInvoiceItem(ReadingModel invoice) {
+  Widget _buildNoInvoicesCard(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Iconsax.tick_circle,
+              size: 40,
+              color: Colors.green,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'لا توجد فواتير غير مدفوعة',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'جميع فواتير هذا العميل تم دفعها',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceItem(ReadingModel invoice, ThemeData theme) {
     final isSelected = selectedInvoice?.id == invoice.id;
-    final invoiceDate = Helpers.formatDate(invoice.readingDate);
-    final invoiceAmount = Helpers.formatCurrency(invoice.remainingAmount!);
+    final consumption = invoice.consumption ?? 0;
+    final amount = (invoice.totalAmount ?? 0) - (invoice.subscription == 1 ? 300 : 0);
 
     return InkWell(
+      overlayColor: WidgetStatePropertyAll(Colors.transparent),
       onTap: () {
         setState(() {
           selectedInvoice = isSelected ? null : invoice;
@@ -290,235 +489,287 @@ class _PayBillScreenState extends State<PayBillScreen> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white70 : null,
+          color: isSelected ? theme.colorScheme.primary.withOpacity(0.05) : Colors.grey.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Colors.blue : Colors.grey.shade300,
+            color: isSelected ? theme.colorScheme.secondary : Colors.grey.withOpacity(0.2),
             width: isSelected ? 2 : 1,
           ),
-          borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.blue : null,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isSelected ? Icons.check : Icons.receipt,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? theme.colorScheme.secondary : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isSelected ? Iconsax.tick_circle : Iconsax.receipt,
+                    color: isSelected ? Colors.white : Colors.grey,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'فاتورة ${invoice.id}',
+                        'فاتورة ${Helpers.formatDate(invoice.readingDate)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.blue : null,
                         ),
                       ),
-                      Text(
-                        invoiceDate,
-                        style: TextStyle(
-                          color: isSelected ? Colors.blue : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-
+                      const SizedBox(height: 4),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Text(
-                            'السابقه: ${invoice.previousReading} وحده',
-                            style: TextStyle(
-                                fontSize: 12,
-                              color: isSelected ? Colors.blue : null,
+                          _buildInvoiceDetailChip(
+                            label: 'الاستهلاك',
+                            value: '$consumption',
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 5),
+                          _buildInvoiceDetailChip(
+                            label: 'المبلغ',
+                            value: Helpers.formatCurrency(amount + (invoice.subscription == 1 ? 300 : 0)),
+                            color: Colors.green,
+                          ),
 
-                            ),
-                          ),
-                          Text(
-                            'الحالبه: ${invoice.currentReading} وحده',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isSelected ? Colors.blue : null,
-                            ),
-                          ),
+
                         ],
                       ),
 
-                      SizedBox(height: 9,),
-                      Text(
-                        'الاستهلاك: ${invoice.consumption} وحده',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? Colors.blue : null,
-                        ),
+                      const SizedBox(height: 10),
+                      _buildInvoiceDetailChip(
+                        label: 'اشتراك',
+                        value: Helpers.formatCurrency((invoice.subscription == 1 ? 300 : 0)),
+                        color: Colors.green,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'المبلغ: $invoiceAmount',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                      if (isSelected)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'محددة',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                    ],
+                ),
+              ],
+            ),
+            if (isSelected) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildInvoiceStat(
+                    label: 'السابقة',
+                    value: '${invoice.previousReading ?? 0}',
+                    icon: Iconsax.arrow_down,
+                  ),
+                  _buildInvoiceStat(
+                    label: 'الحالية',
+                    value: '${invoice.currentReading ?? 0}',
+                    icon: Iconsax.arrow_up,
+                  ),
+                  _buildInvoiceStat(
+                    label: 'الاستهلاك',
+                    value: '$consumption',
+                    icon: Iconsax.flash,
                   ),
                 ],
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAmountField() {
+  Widget _buildInvoiceDetailChip({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceStat({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey.shade600),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmountField(ThemeData theme) {
     String hintText = 'أدخل المبلغ المراد دفعه';
     double maxAmount = selectedClient!.totalDebt;
 
     if (selectedInvoice != null) {
-      maxAmount = selectedInvoice!.totalAmount!;
+      maxAmount = (selectedInvoice!.totalAmount ?? 0) + 300;
       hintText = 'مبلغ الفاتورة: ${Helpers.formatCurrency(maxAmount)}';
     }
 
-    return TextFormField(
-      controller: _amountController,
-      decoration: InputDecoration(
-        labelText: 'المبلغ المدفوع',
-        prefixIcon: const Icon(Icons.attach_money),
-        border: const OutlineInputBorder(),
-        suffixText: 'ر.ي',
-        suffixStyle: const TextStyle(fontWeight: FontWeight.bold),
-        hintText: hintText,
-        filled: true,
-        fillColor: Colors.transparent,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(width: 1 , color: Color(0x0ff3c56c)),
+
       ),
-      keyboardType: TextInputType.number,
-      readOnly: paySpecificInvoice && selectedInvoice != null,
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'يرجى إدخال المبلغ';
-        }
-        final amount = double.tryParse(value);
-        if (amount == null || amount <= 0) {
-          return 'يرجى إدخال مبلغ صحيح';
-        }
-        if (amount > maxAmount) {
-          return 'المبلغ أكبر من الحد الأقصى';
-        }
-        return null;
-      },
+      child: TextFormField(
+        controller: _amountController,
+        decoration: InputDecoration(
+          labelStyle: TextStyle(color: Colors.grey.shade600),
+          prefixIcon: Icon(Iconsax.money, color: theme.colorScheme.primary),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          suffixText: 'ر.ي',
+          suffixStyle: const TextStyle(fontWeight: FontWeight.bold),
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+          contentPadding: const EdgeInsets.all(16),
+        ),
+        keyboardType: TextInputType.number,
+        readOnly: paySpecificInvoice && selectedInvoice != null,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'يرجى إدخال المبلغ';
+          }
+          final amount = double.tryParse(value);
+          if (amount == null || amount <= 0) {
+            return 'يرجى إدخال مبلغ صحيح';
+          }
+          if (amount > maxAmount) {
+            return 'المبلغ أكبر من الحد الأقصى';
+          }
+          return null;
+        },
+      ),
     );
   }
 
-  Widget _buildNotesField() {
-    return TextFormField(
-      controller: _notesController,
-      decoration: const InputDecoration(
-        labelText: 'ملاحظات الدفع (اختياري)',
-        prefixIcon: Icon(Icons.note),
-        border: OutlineInputBorder(),
-        filled: true,
-        fillColor: Colors.transparent,
+  Widget _buildNotesField(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(width: 1 , color: Color(0x0ff3c56c)),
+
       ),
-      maxLines: 3,
+      child: TextFormField(
+        controller: _notesController,
+        decoration: InputDecoration(
+          labelText: 'ملاحظات الدفع (اختياري)',
+          labelStyle: TextStyle(color: Colors.grey.shade600),
+          prefixIcon: Icon(Iconsax.note, color: theme.primaryColor),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(16),
+        ),
+        maxLines: 3,
+      ),
     );
   }
 
-
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(ThemeData theme) {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-
-              child: ElevatedButton(
-                onPressed: () => _submitPayment(),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: CupertinoColors.systemGreen,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.white),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'تأكيد الدفع',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white
-                      ),
-                    ),
-                  ],
+        ElevatedButton(
+          onPressed: isProcessing.value ? null : _submitPayment,
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 56),
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 4,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(isProcessing.value ? Iconsax.timer : Iconsax.tick_circle),
+              const SizedBox(width: 12),
+              Text(
+                isProcessing.value ? 'جاري المعالجة...' : 'تأكيد الدفع',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-
-          ],
+            ],
+          ),
         ),
 
-        const SizedBox(height: 10),
-        if (selectedInvoice != null)
-          Text(
-            'سيتم تسديد فاتورة رقم ${selectedInvoice!.id} بقيمة ${Helpers.formatCurrency(selectedInvoice!.totalAmount!)}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.green,
-              fontWeight: FontWeight.bold,
+        if (selectedInvoice != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.withOpacity(0.2)),
             ),
-            textAlign: TextAlign.center,
+            child: Row(
+              children: [
+                const Icon(Iconsax.info_circle, color: Colors.green, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'سيتم تسديد فاتورة بقيمة ${Helpers.formatCurrency((selectedInvoice!.totalAmount ?? 0) + 300)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ],
       ],
     );
   }
 
   void _updateAmountField() {
-    if ( selectedInvoice != null) {
-      _amountController.text = selectedInvoice!.remainingAmount!.toStringAsFixed(2);
+    if (selectedInvoice != null) {
+      _amountController.text = ((selectedInvoice!.totalAmount ?? 0) + 300).toStringAsFixed(2);
     } else {
       _amountController.clear();
     }
@@ -526,64 +777,83 @@ class _PayBillScreenState extends State<PayBillScreen> {
 
   void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
-      final amount = double.tryParse(_amountController.text);
 
-      if (amount == null) {
-        Helpers.customSnackBar(
-          title: 'خطأ',
-          message: 'المبلغ غير صالح',
-          background: Colors.red,
-        );
+      final hasConnection = await _authController.checkInternetConnection();
+      if (!hasConnection) {
+        Helpers.showErrorSnackBar('لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك');
         return;
       }
 
-      if (selectedInvoice != null) {
+      final amount = double.tryParse(_amountController.text);
 
-        var success = await _clientController.paySpecificInvoice(
-          clientId: selectedClient!.id!,
-          invoiceId: selectedInvoice!.id!,
-          paidAmount: amount,
-          price: selectedInvoice!.totalAmount!,
-          notes: _notesController.text,
-          paybay: user.fullName
-        );
-
-
-        if (success) {
-          await _clientController.loadClients();
-          await _clientController.loadClient(clientId: selectedClient!.id!);
-          await _loadClient();
-          _clientController.update();
-          _readingController.update();
-          await _loadUnpaidInvoices(selectedClient!.id!);
-          await _readingController.loadClientReadings(clientId: selectedClient!.id!);
-
-          Helpers.customSnackBar(
-            title: 'تم',
-            message:'تم تسديد الفاتورة بنجاح',
-            background: CupertinoColors.systemGreen,
-          );
-
-
-        } else {
-          Helpers.customSnackBar(
-            title: 'فشل',
-            message: 'فشلت العملية',
-            background: Colors.red,
-          );
-        }
-
+      if (amount == null) {
+        _showErrorSnackBar('المبلغ غير صالح');
+        return;
       }
 
+      isProcessing.value = true;
 
+        if (selectedInvoice != null) {
+          final success = await _clientController.paySpecificInvoice(
+            clientId: selectedClient!.id!,
+            invoiceId: selectedInvoice!.id!,
+            paidAmount: amount,
+            price: selectedInvoice!.remainingAmount ?? 0,
+            notes: _notesController.text,
+            paybay: user.fullName,
+          );
+
+          if (success) {
+            await _refreshData();
+            _showSuccessSnackBar('تم تسديد الفاتورة بنجاح');
+            Get.back();
+          } else {
+            _showErrorSnackBar('فشلت عملية الدفع');
+          }
+        } else {
+          _showErrorSnackBar('الرجاء اختيار فاتورة');
+        }
 
     }
   }
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _notesController.dispose();
-    super.dispose();
+  Future<void> _refreshData() async {
+    await _clientController.loadClients();
+    await _clientController.loadClient(clientId: selectedClient!.id!);
+    await _loadClient();
+    await _loadUnpaidInvoices(selectedClient!.id!);
+    await _readingController.loadClientReadings(clientId: selectedClient!.id!);
+    invoice.update();
+    invoice.fetchAllInvoices();
+  }
+
+  void _showSuccessSnackBar(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.snackbar(
+        'تم',
+        message,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        icon: const Icon(Iconsax.tick_circle, color: Colors.white),
+      );
+    });
+  }
+
+  void _showErrorSnackBar(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.snackbar(
+        'خطأ',
+        message,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        icon: const Icon(Iconsax.close_circle, color: Colors.white),
+      );
+    });
   }
 }

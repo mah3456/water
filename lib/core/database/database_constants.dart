@@ -34,6 +34,7 @@ class DatabaseConstants {
   static const String remainingAmount = 'remaining_amount';
   static const String isPaid = 'is_paid';
   static const String reader = 'reader';
+  static const String subscription = 'subscription';
   static const String  payby= 'payby';
 
   // حقول مشتركة

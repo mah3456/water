@@ -103,7 +103,7 @@ class ClientCard extends StatelessWidget {
                 ),
               ],
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 15),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -118,8 +118,9 @@ class ClientCard extends StatelessWidget {
                           fontSize: 12,
                         ),
                       ),
+                      SizedBox(height: 5,),
                       Text(
-                        '${client.totalDebt.toStringAsFixed(2)} د.ع',
+                        '${client.totalDebt.toStringAsFixed(2)} ر.ي',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

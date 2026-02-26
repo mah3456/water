@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../controllers/profilecontroller.dart';
 
 class EditProfileView extends StatefulWidget {
@@ -34,6 +35,10 @@ class _EditProfileViewState extends State<EditProfileView> {
   Widget build(BuildContext context) {
     return Obx(() => Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_right),
+          onPressed: () => Get.back(),
+        ),
         title: const Text('تعديل البيانات'),
         centerTitle: true,
       ),
@@ -101,10 +106,13 @@ class _EditProfileViewState extends State<EditProfileView> {
                     child: ElevatedButton(
                       onPressed: () => _saveProfile(),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
+                          side:BorderSide(color: Color(0x0ff3c56c)),
+
+
+
                         ),
                       ),
                       child: const Text(

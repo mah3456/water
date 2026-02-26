@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:water/data/models/client_model.dart';
-import 'package:water/presentation/controllers/auth_controller.dart';
 import 'package:water/core/utils/helpers.dart';
 
 import '../../core/supabase/supabase_client_helper.dart';
@@ -38,9 +37,11 @@ class ClientsController extends GetxController {
   Future<void> loadClients() async {
     try {
       isLoading.value = true;
-      
+
       final loadedClients = await _repository.getAllClients();
       clients.assignAll(loadedClients);
+
+      selectedClient.value = client;
 
     } catch (e) {
       print('Error loading clients: $e');
@@ -50,17 +51,49 @@ class ClientsController extends GetxController {
   }
 
   // جلب عميل محدد
+  // Future<void> loadClient({required int clientId}) async {
+  //   try {
+  //     isLoading.value = true;
+  //
+  //     final loadedClient = await _repository.getClientById(clientId: clientId);
+  //     if (loadedClient != null) {
+  //       client = loadedClient;
+  //     }
+  //   } catch (e) {
+  //     Get.snackbar('خطأ', 'فشل في تحميل العميل');
+  //     print('Error loading client: $e');
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+
+
+  // تعديل دالة loadClient
   Future<void> loadClient({required int clientId}) async {
     try {
       isLoading.value = true;
-      
-      final loadedClient = await _repository.getClientById(clientId: clientId);
-      if (loadedClient != null) {
-        client = loadedClient;
-      }
+
+
+      // استخدام selectedClient بدلاً من client مباشرة
+
+          final loadedClient = await _repository.getClientById(clientId: clientId);
+          if (loadedClient != null) {
+            client = loadedClient;
+            selectedClient.value = client;
+
+          }
+
     } catch (e) {
-      Get.snackbar('خطأ', 'فشل في تحميل العميل');
       print('Error loading client: $e');
+      // استخدام WidgetsBinding.instance.addPostFrameCallback لتأخير الـ Snackbar
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.snackbar(
+          'خطأ',
+          'فشل تحميل بيانات العميل',
+          backgroundColor: Colors.red.shade100,
+          colorText: Colors.red.shade900,
+        );
+      });
     } finally {
       isLoading.value = false;
     }
@@ -79,12 +112,21 @@ class ClientsController extends GetxController {
       }
       return false;
     } catch (e) {
+
+
+      // if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+      //   Helpers.customSnackBar(
+      //       title: 'خطا!',
+      //       message: 'لا يوجد اتصال بالانترنت',
+      //       background: Colors.red
+      //   );
+      // }
+
       Helpers.customSnackBar(
-        title: 'خطا!', 
-        message: 'فشل اضافة عميل', 
-        background: Colors.red
+          title: 'خطا!',
+          message: 'فشل اضافة عميل',
+          background: Colors.red
       );
-      print('Error adding client: $e');
       return false;
     } finally {
       isLoading.value = false;
@@ -140,6 +182,22 @@ class ClientsController extends GetxController {
       }
       return false;
     } catch (e) {
+
+
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+
+      Helpers.customSnackBar(
+          title: 'خطا!',
+          message: 'فشل تجديث العميل',
+          background: Colors.red
+      );
       return false;
     }
   }
@@ -207,6 +265,18 @@ class ClientsController extends GetxController {
         remaining: remaining,
         payBy: paybay,
       );
+
+
+
+      print('price ${price}');
+
+      print('paid ${paidAmount}');
+
+
+
+
+
+
 
       // تسديد المبلغ من دين العميل
       await payBill(clientId: clientId, amount: paidAmount);

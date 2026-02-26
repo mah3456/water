@@ -44,6 +44,10 @@ dependencies:
   supabase_flutter: ^2.12.0
   validation_textformfield: ^2.2.5
   flutter_launcher_icons: ^0.14.4
+  local_auth: ^3.0.0
+  flutter_secure_storage: ^9.0.0
+  iconsax: ^0.0.8
+
 
 
 flutter_launcher_icons:

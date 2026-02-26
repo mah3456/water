@@ -7,8 +7,10 @@ import '../../main.dart';
 
 class themecont extends GetxController {
   final RxBool _isDarkMode = true.obs;
+  final RxBool _biometric = false.obs;
 
   bool get isDarkMode => _isDarkMode.value;
+  bool get biometric => _biometric.value;
 
   @override
   void onInit() {
@@ -32,6 +34,12 @@ class themecont extends GetxController {
     _updateTheme();
   }
 
+
+  Future<void> toggleBio() async {
+    _biometric.value = !_biometric.value;
+    await shared.setBool('bio', _biometric.value);
+  }
+
   Future<void> setTheme(bool isDark) async {
     _isDarkMode.value = isDark;
     await shared.setBool('isDarkMode', isDark);
@@ -50,7 +58,8 @@ class themecont extends GetxController {
       fontFamily: 'cairo',
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.background,
+      scaffoldBackgroundColor: colorScheme.surface,
+
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
@@ -59,6 +68,8 @@ class themecont extends GetxController {
       ),
 
 
+      
+      
       buttonTheme: ButtonThemeData(
         buttonColor: colorScheme.primary,
         textTheme: ButtonTextTheme.primary,
@@ -100,6 +111,10 @@ class themecont extends GetxController {
         color: colorScheme.surfaceVariant,
         thickness: 1,
         space: 1,
+      ),
+
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colorScheme.secondary,
       ),
 
       bottomNavigationBarTheme: BottomNavigationBarThemeData(

@@ -20,6 +20,16 @@ class Helpers {
     ).format(amount);
   }
 
+  static void showErrorSnackBar(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Helpers.customSnackBar(
+        title: 'خطأ',
+        message: message,
+        background: Colors.red,
+      );
+    });
+  }
+
   static bool isValidPhone(String phone) {
     return phone.length >= 10;
   }
@@ -71,18 +81,22 @@ class Helpers {
           content: content,
           actions: [
             TextButton(
-              style: ButtonStyle(elevation: WidgetStatePropertyAll(0)),
+              style: ButtonStyle(
+                  elevation: WidgetStatePropertyAll(0),
+                  foregroundColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.surface),
+                  overlayColor: WidgetStatePropertyAll(Theme.of(context).colorScheme.surface)
+              
+              ),
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
             ),
 
-            ElevatedButton(
+            TextButton(
               onPressed: () => delete(),
               style: ElevatedButton.styleFrom(
                   elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  overlayColor: Colors.transparent,
-                  foregroundColor: Colors.transparent
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  overlayColor: Theme.of(context).colorScheme.surface,
               ),
               child: const Text('حذف', style: TextStyle(color: Colors.red)),
             ),
@@ -90,6 +104,10 @@ class Helpers {
         ),
       );
     }
+
+
+
+
 
 
 

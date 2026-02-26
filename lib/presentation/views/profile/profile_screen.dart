@@ -1,19 +1,38 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:water/presentation/views/auth/login_screen.dart';
+import '../../../core/utils/helpers.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/profilecontroller.dart';
 import 'EditProfileView.dart';
-import 'UpdateEmailScreen.dart';
 
 class ProfileView extends StatelessWidget {
-
   ProfileView({super.key});
 
   final ProfileController controller = Get.put(ProfileController());
+  final
+  AuthController _authController = Get.find<AuthController>();
+
+  Future<void> _checkInitialConnection() async {
+    final hasConnection = await _authController.checkInternetConnection();
+    if (!hasConnection) {
+      Helpers.showErrorSnackBar('لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك');
+      return;
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
+
+
+
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'الملف الشخصي',
@@ -23,66 +42,21 @@ class ProfileView extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        surfaceTintColor: Colors.transparent,
-        elevation: 1,
-
+        elevation: 0,
+        backgroundColor: theme.primaryColor,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_right),
+          onPressed: () => Get.back(),
+        ),
       ),
       body: Obx(() {
         if (controller.isLoading.value && controller.userProfile.value.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.blue),
-                SizedBox(height: 20),
-                Text(
-                  'جاري تحميل البيانات...',
-                  style: TextStyle(color: Colors.blue),
-                ),
-              ],
-            ),
-          );
+          return _buildLoadingState(theme);
         }
 
         if (!controller.isLoggedIn) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.person_off,
-                  size: 80,
-                  color: Colors.grey,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'لم تقم بتسجيل الدخول',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Get.to(LoginScreen()),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'تسجيل الدخول',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildNotLoggedInState(theme);
         }
 
         return RefreshIndicator(
@@ -91,46 +65,44 @@ class ProfileView extends StatelessWidget {
               await controller.getUserProfile(userId: controller.currentUser.value!.id);
             }
           },
-          color: Colors.blue,
+          color: theme.primaryColor,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
                 // قسم الصورة والاسم
-                _buildProfileHeader(),
+                _buildProfileHeader(context, theme),
+
+                const SizedBox(height: 20),
 
                 // البطاقات المعلوماتية
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
                       _buildInfoCard(
+                        theme: theme,
                         title: 'المعلومات الشخصية',
-                        icon: Icons.person_outline,
+                        icon: Iconsax.profile_circle,
                         children: [
                           _buildInfoItem(
-                            icon: Icons.email_outlined,
+                            icon: Iconsax.sms,
                             label: 'البريد الإلكتروني',
                             value: controller.email,
                             color: Colors.blue,
-                            lefticon: InkWell(
-                              onTap: () => Get.to(UpdateEmailScreen()),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.update),
-                              ),
-                            )
+                            onEdit: () {
+                              Helpers.customSnackBar(
+                                title: 'قريباً',
+                                message: 'خدمة تغيير البريد ستتوفر قريباً',
+                                background: CupertinoColors.systemBlue,
+                              );
+                            },
                           ),
                           _buildInfoItem(
-                            icon: Icons.phone_outlined,
+                            icon: Iconsax.call,
                             label: 'رقم الهاتف',
                             value: controller.phone,
                             color: Colors.green,
-                            lefticon: SizedBox()
                           ),
                         ],
                       ),
@@ -138,30 +110,30 @@ class ProfileView extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       _buildInfoCard(
+                        theme: theme,
                         title: 'معلومات الحساب',
-                        icon: Icons.account_circle_outlined,
+                        icon: Iconsax.security_card,
                         children: [
                           _buildInfoItem(
-                            icon: Icons.date_range_outlined,
+                            icon: Iconsax.calendar,
                             label: 'تاريخ التسجيل',
                             value: controller.createdAt,
-                            color: Colors.teal,
-                            lefticon: SizedBox()
+                            color: Colors.orange,
                           ),
                           _buildInfoItem(
-                            icon: Icons.verified_outlined,
+                            icon: Iconsax.tick_circle,
                             label: 'حالة الحساب',
                             value: 'مفعل',
                             color: Colors.green,
-                            lefticon: SizedBox()
+                            isStatus: true,
                           ),
                         ],
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
 
                       // أزرار التحكم
-                      _buildActionButtons(),
+                      _buildActionButtons(theme),
 
                       const SizedBox(height: 30),
                     ],
@@ -175,66 +147,24 @@ class ProfileView extends StatelessWidget {
     );
   }
 
-  // بناء رأس الملف الشخصي
-  Widget _buildProfileHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
+  Widget _buildLoadingState(ThemeData theme) {
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 16),
-
-          // الاسم
-          Obx(() => Text(
-            controller.fullName,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue,
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: CircularProgressIndicator(
+              color: theme.primaryColor,
+              strokeWidth: 3,
             ),
-          )),
-
-          const SizedBox(height: 8),
-
-          // البريد الإلكتروني
-          Obx(() => Text(
-            controller.email,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'جاري تحميل البيانات...',
             style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          )),
-
-          const SizedBox(height: 20),
-
-          // زر التعديل
-          ElevatedButton.icon(
-            onPressed: () => Get.to(() => EditProfileView()),
-            icon: const Icon(Icons.edit, size: 18),
-            label: const Text('تعديل الملف الشخصي'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 10,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-              elevation: 0,
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              fontSize: 16,
             ),
           ),
         ],
@@ -242,39 +172,219 @@ class ProfileView extends StatelessWidget {
     );
   }
 
-  // بناء بطاقة المعلومات
+  Widget _buildNotLoggedInState(ThemeData theme) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Iconsax.profile_delete,
+                size: 80,
+                color: theme.primaryColor.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'لم تقم بتسجيل الدخول',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.titleLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'يرجى تسجيل الدخول للوصول إلى ملفك الشخصي',
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Get.to(() => LoginScreen()),
+              icon: const Icon(Iconsax.login),
+              label: const Text('تسجيل الدخول'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(BuildContext context, ThemeData theme) {
+
+    return Container(
+      width: double.infinity,
+      height: 260,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(40),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.primaryColor.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // صورة المستخدم
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Obx(() => Text(
+                  controller.fullName.isNotEmpty
+                      ? controller.fullName[0].toUpperCase()
+                      : 'U',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor,
+                  ),
+                )),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // الاسم
+            Obx(() => Text(
+              controller.fullName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )),
+
+            const SizedBox(height: 8),
+
+            // البريد الإلكتروني
+            Obx(() => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Iconsax.sms, color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    controller.email,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+
+            const SizedBox(height: 20),
+
+            // زر التعديل
+            ElevatedButton.icon(
+              onPressed: () {
+                _checkInitialConnection();
+               _authController.isConnected.value ? Get.to(() => EditProfileView()):null;
+               },
+              icon: const Icon(Iconsax.edit, size: 18),
+              label: const Text('تعديل الملف الشخصي'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: theme.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoCard({
+    required ThemeData theme,
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(width: 1 , color: Color(0x0ff3c56c)),
+
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, color: Colors.blue, size: 22),
-                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
                 Text(
                   title,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            const Divider(height: 1, color: Colors.grey),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             ...children,
           ],
         ),
@@ -282,77 +392,142 @@ class ProfileView extends StatelessWidget {
     );
   }
 
-  // بناء عنصر معلومات
   Widget _buildInfoItem({
     required IconData icon,
-    required Widget lefticon,
     required String label,
     required String value,
     required Color color,
+    VoidCallback? onEdit,
+    bool isStatus = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-
+          // الأيقونة
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
+
           const SizedBox(width: 12),
+
+          // المحتوى
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey,
+                    color: Colors.grey.shade600,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isStatus ? Colors.green : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isStatus)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'نشط',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          lefticon
+          // زر التعديل إذا وجد
+          if (onEdit != null)
+            IconButton(
+              onPressed: onEdit,
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Iconsax.edit, color: Colors.blue, size: 16),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  // أزرار التحكم
-  Widget _buildActionButtons() {
-    return Row(
+  Widget _buildActionButtons(ThemeData theme) {
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _showLogoutDialog,
-            icon: const Icon(Icons.logout, size: 18),
-            label: const Text('تسجيل الخروج'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+        // زر تسجيل الخروج
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.red.withOpacity(0.2)),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _showLogoutDialog,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Iconsax.logout, color: Colors.red.shade400),
+                    const SizedBox(width: 12),
+                    Text(
+                      'تسجيل الخروج',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // معلومات الإصدار
+        Center(
+          child: Text(
+            'الإصدار 1.0.0',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
             ),
           ),
         ),
@@ -360,30 +535,39 @@ class ProfileView extends StatelessWidget {
     );
   }
 
-  // تسجيل الخروج
   void _showLogoutDialog() {
     Get.dialog(
       AlertDialog(
         title: const Text('تسجيل الخروج'),
         content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: const Text('إلغاء' , style: TextStyle(color: Colors.grey),),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey.shade700,
+            ),
+            child: const Text('إلغاء'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Get.back();
-              await controller.signOut().then((value) => Get.off(LoginScreen()));
+              await controller.signOut();
+              Get.offAll(() => LoginScreen());
             },
-            child: const Text(
-              'تسجيل الخروج',
-              style: TextStyle(color: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
+            child: const Text('تسجيل الخروج'),
           ),
         ],
       ),
     );
   }
-
 }

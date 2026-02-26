@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_client_helper.dart';
+import '../../core/utils/helpers.dart';
 import '../../data/models/reading_model.dart';
 import '../../data/repositories/ReadingRepository.dart';
 import 'ClientsController.dart';
@@ -12,6 +14,8 @@ class ReadingsController extends GetxController {
   var readings = <ReadingModel>[].obs;
   var isLoading = false.obs;
   final ratePerUnit = 1200.0.obs;
+  bool subscription = true;
+
 
   Future<bool> addReading({
     required int clientId,
@@ -20,12 +24,12 @@ class ReadingsController extends GetxController {
     required DateTime readingDate,
     required double totalAmount,
     required String reader,
+    required int subscription
   }) async {
 
     isLoading.value = true;
 
     try {
-      final consumption = currentReading - previousReading;
 
       isLoading.value = true;
 
@@ -38,6 +42,7 @@ class ReadingsController extends GetxController {
         ratePerUnit: ratePerUnit.value,
         remainingAmount: totalAmount,
         totalAmount: totalAmount,
+        subscription: subscription,
         createdAt: DateTime.now(),
       );
 
@@ -66,8 +71,29 @@ class ReadingsController extends GetxController {
       print(e.message);
       return false;
     } catch (e) {
-      Get.snackbar('خطأ غير متوقع', e.toString());
+
+
+
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
+
+      Helpers.customSnackBar(
+          title: 'خطا!',
+          message: 'فشل اضافة قراءه عميل',
+          background: Colors.red
+      );
       return false;
+    } finally{
+      isLoading.value = false;
+
     }
   }
 
@@ -79,6 +105,16 @@ class ReadingsController extends GetxController {
     } on PostgrestException catch (e) {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
     } catch (e) {
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
       Get.snackbar('خطأ', 'فشل في تحميل القراءات');
     } finally {
       isLoading.value = false;
@@ -93,6 +129,16 @@ class ReadingsController extends GetxController {
       print('خطأ في قاعدة البيانات ${e.message}');
       return null;
     } catch (e) {
+
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
       return null;
     }
   }
@@ -111,6 +157,16 @@ class ReadingsController extends GetxController {
     } on PostgrestException catch (e) {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
     } catch (e) {
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
       Get.snackbar('خطأ', 'فشل في تحديث حالة الدفع');
     }
   }
@@ -120,6 +176,7 @@ class ReadingsController extends GetxController {
         .where((reading) => !reading.isPaid)
         .fold(0.0, (sum, reading) => sum + reading.totalAmount!);
   }
+
 
   Future<bool> delete({required int readingId}) async {
     try {
@@ -139,6 +196,17 @@ class ReadingsController extends GetxController {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
       return false;
     } catch (e) {
+
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
       Get.snackbar('خطأ', 'فشل في حذف القراءة');
       return false;
     }
@@ -165,6 +233,17 @@ class ReadingsController extends GetxController {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
       return false;
     } catch (e) {
+
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
       Get.snackbar('خطأ', 'فشل في تحديث المبلغ');
       return false;
     }
@@ -177,6 +256,15 @@ class ReadingsController extends GetxController {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
       return [];
     } catch (e) {
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
       return [];
     }
   }
@@ -188,6 +276,16 @@ class ReadingsController extends GetxController {
       Get.snackbar('خطأ في قاعدة البيانات', e.message);
       return [];
     } catch (e) {
+      if(e.toString().contains('ClientException with SocketException: Failed host lookup')){
+        Helpers.customSnackBar(
+            title: 'خطا!',
+            message: 'لا يوجد اتصال بالانترنت',
+            background: Colors.red
+        );
+      }
+
+      isLoading.value = false;
+
       return [];
     }
   }
